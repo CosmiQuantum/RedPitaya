@@ -12,7 +12,7 @@ LOCAL_DATA_DIR = Path.home() / "Desktop" / "gitorr" / "RedPitaya" / "data" / "or
 
 # scan and laser settings
 SAMPLING_RATE = 32000
-SCAN_DURATION = 60
+SCAN_DURATION = 900
 CHUNK_SAMPLES = 960000
 LASER_POWER = 3        
 LASER_WAVELENGTH = 1550  
