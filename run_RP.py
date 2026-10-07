@@ -34,7 +34,7 @@ def main():
         f"laser_wavelength={LASER_WAVELENGTH}, "
         f"start_timestamp={start_timestamp!r}"
         "); "
-        "print(f'Output folder: {folder}')"
+        "print(f'OUTPUT_FOLDER={folder}')"
     )
 
     ssh_command = ["ssh", f"{RP_USER}@{RP_IP}", (f"cd {REMOTE_DIR} && "f"PYTHONPATH=/opt/redpitaya/lib/python:$PYTHONPATH "f'python3 -u -c "{remote_python}"')]
