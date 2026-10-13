@@ -10,30 +10,37 @@ class RedPitayaLocalDriver:
     DATESTRING_FMT = "%Y%m%d_%H%M%S"
 
     def check(self, result, operation):
-        '''
-        Checks if a hardware command has gone through
-        Arguments
-        - result:                   red pitaya will either return 0 or rp.ok if the command has worked
-        - operation:                command you are sending
-        Returns
-        - If red pitaya confirms the command went through, then nothing is returned. Otherwise it will raise an error
-        '''
+        """Check a status returned by the Red Pitaya API. [AI edit]
+
+        Args:
+            result: API status code; success is ``rp.RP_OK``.
+            operation: Operation name included in the error message.
+
+        Raises:
+            RuntimeError: If the status does not indicate success.
+        """
         if result != rp.RP_OK:
             raise RuntimeError(f"{operation} failed:{result}")
 
     def setParameters(self, sampling_rate_wanted, scan_duration, chunk_samples):
-        '''
-        Sets parameters for data acquisition
-        Arguments
-        - sampling_rate_wanted:     frequency you want to sample in. Due to decimation, it will be slightly different
-        - scan_duration:            time of scan in seconds
-        - chunk_samples:            amount of samples to load into memory at once before saving that chunk
-        Returns
-        - sampling_rate_real:       actual rate at which the sampling will occur
-        - decimation:               the red pitaya clock will sample at its own rate, decimation divides the clock to get effective sampling rate as we want
-        - total_samples:            total samples that will need to be collected for the run
-        - needed_chunks:            how many separate files will be needed for the total run
-        '''
+        """Calculate acquisition parameters from the 125 MHz clock. [AI edit]
+
+        Args:
+            sampling_rate_wanted: Requested sampling rate in samples per second.
+            scan_duration: Requested acquisition duration in seconds.
+            chunk_samples: Samples per chunk, rounded down to a multiple of eight.
+
+        Returns:
+            dict: Calculated rate, decimation, total samples, chunk count, and
+            aligned chunk size. The current implementation uses numeric values
+            as keys and parameter names as values; ``collectData`` expects the
+            reverse mapping and therefore currently raises ``KeyError``.
+
+        Notes:
+            Inputs are not validated. Zero divisors can raise ZeroDivisionError.
+            The final chunk is acquired in full, so the requested sample count
+            may be exceeded.
+        """
 
         ## Getting actual sampling rate from the red pitaya clock
         clock = 125 * 10**6
@@ -63,18 +70,33 @@ class RedPitayaLocalDriver:
         }
 
     def collectData(self, sampling_rate_wanted=32000, scan_duration=10, chunk_samples=32000, start_timestamp=None, extra_metadata={}):
-        '''
-        Collects data for a period of time at wanted sampling rate. Importantly, this is for input 1 with the physical limiter set to high voltage
-        Arguments
-        - sampling_rate_wanted:     frequency you want to sample in. Due to decimation, it will be slightly different
-        - scan_duration:            time of scan in seconds
-        - chunk_samples:            amount of samples to load into memory at once before saving that chunk
-        - laser_power:              laser power in milliwatts
-        - laser_wavelength:         laser wavelength in nanometers
-        - start_timestamp:          laptop time
-        Returns
-        - run_folder:               the folder in which data is saved
-        '''
+        """Acquire channel 1 voltage chunks and save HDF5 files. [AI edit]
+
+        Args:
+            sampling_rate_wanted: Requested samples per second (default 32000).
+            scan_duration: Requested acquisition duration in seconds (default 10).
+            chunk_samples: Samples per file, aligned down to a multiple of eight.
+            start_timestamp: Optional timestamp in ``DATESTRING_FMT`` format;
+                defaults to the device's current local time.
+            extra_metadata: Intended mapping of additional HDF5 attributes with
+                scalar numeric or string values.
+
+        Returns:
+            pathlib.Path: Relative run directory named ``<timestamp>_N<chunks>``.
+
+        Raises:
+            RuntimeError: If a checked hardware operation fails.
+            ValueError: If the supplied timestamp cannot be parsed.
+
+        Notes:
+            Requires the device's ``rp`` bindings and channel 1's physical jumper
+            set to the high-voltage range. Files contain a ``Voltage (V)`` dataset
+            and acquisition attributes. Acquisition is stopped and the API is
+            released in the acquisition block's finally clause.
+            Currently blocked by the mapping returned by ``setParameters``.
+            Nonempty metadata also requires repairs: iteration does not use
+            ``items()`` and assignment refers to undefined ``f_attrs``.
+        """
 
         ## Set the parameters and determine the real parameters
         real_params = self.setParameters(sampling_rate_wanted, scan_duration, chunk_samples)
@@ -141,7 +163,7 @@ class RedPitayaLocalDriver:
 
                 with h5py.File(output, "w") as f:
                     dataset = f.create_dataset("Voltage (V)", data = np.array([voltage_data[i] for i in range(chunk_samples)]))
-                    
+
                     ## Store the DAQ metadata
                     f.attrs["date"] = start_time.strftime(self.DATESTRING_FMT)
                     f.attrs["total_samples"] = total_samples

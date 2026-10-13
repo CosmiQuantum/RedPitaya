@@ -18,6 +18,16 @@ class RedPitayaRemoteInterface:
     def __init__(self, ip="192.168.137.111", local_dir="rp_data"):
 
         ## Define the connection / local details for Red Pitaya
+        """Configure the remote connection and local data destination. [AI generated]
+
+        Args:
+            ip: Device IP address, default ``192.168.137.111``.
+            local_dir: Local download directory, default ``rp_data``.
+
+        Notes:
+            Uses SSH user ``root`` and remote directory
+            ``/home/jupyter/RedPitaya``; no connection is opened here.
+        """
         self.RP_USER = "root"
         self.RP_WORKDIR = PurePosixPath("/home/jupyter/RedPitaya") ## always needs to resolve as UNIX path for RP
         self.RP_IP = ip
@@ -26,6 +36,16 @@ class RedPitayaRemoteInterface:
         self.LOCAL_DATA_DIR = Path(local_dir)
 
     def update_laser_params(self, power_mW=None, wavelength_nm=None):
+        """Update laser setpoints used as acquisition metadata. [AI generated]
+
+        Args:
+            power_mW: Power in milliwatts, converted to float when supplied.
+            wavelength_nm: Wavelength in nanometers, converted to float when
+                supplied. ``None`` leaves each corresponding value unchanged.
+
+        Notes:
+            These values do not control laser hardware and are not range-checked.
+        """
         if power_mW is not None:
             print("Updating LASER_POWER_MW to",power_mW,"mW")
             self.LASER_POWER_MW = float(power_mW)
@@ -34,12 +54,37 @@ class RedPitayaRemoteInterface:
             self.LASER_WAVELENGTH_NM = float(wavelength_nm)
 
     def update_local_datadir(self, local_folder):
+        """Set the destination directory for future downloads. [AI generated]
+
+        Args:
+            local_folder: Path-like destination; created later during copying.
+        """
         print("Updating LOCAL_DATA_DIR to",local_folder)
         self.LOCAL_DATA_DIR = Path(local_folder)
 
     def run_acquisition(self, sampling_rate_sps=None, scan_duration_sec=None):
 
         ## Update parameters if provided
+        """Launch a device acquisition over SSH and stream its output. [AI generated]
+
+        Args:
+            sampling_rate_sps: Optional samples-per-second override, stored as float.
+            scan_duration_sec: Optional duration override in seconds, stored as float.
+
+        Returns:
+            tuple[str, float]: Intended remote output directory name and elapsed
+            SSH acquisition time in seconds, including startup overhead.
+
+        Raises:
+            SystemExit: If the remote command exits with a nonzero status.
+            RuntimeError: If the remote output does not identify its output folder.
+
+        Notes:
+            Requires SSH authentication and the driver on the device. Currently
+            the generated command uses unquoted metadata keys, and folder
+            validation/return refer to undefined ``output_folder`` instead of
+            ``remote_output_folder``. These issues prevent successful completion.
+        """
         if sampling_rate_sps is not None:
             print("Updating SAMPLING_RATE_SPS to",sampling_rate_sps,"sps")
             self.SAMPLING_RATE_SPS = float(sampling_rate_sps)
@@ -102,6 +147,26 @@ class RedPitayaRemoteInterface:
 
     def copy_last_acquisition(self, remote_output_folder, local_folder_override=None, remove=True):
         ## Define where the data lives on the RP (ensure UNIX path)
+        """Download a remote run directory using SCP. [AI generated]
+
+        Args:
+            remote_output_folder: Run directory name relative to ``RP_WORKDIR``.
+            local_folder_override: Optional alternative download destination.
+            remove: Whether to delete the remote directory after successful SCP;
+                defaults to True.
+
+        Returns:
+            pathlib.Path: Local path of the downloaded run directory.
+
+        Raises:
+            subprocess.CalledProcessError: If SCP fails.
+
+        Notes:
+            Remote cleanup is destructive. Supply a trusted run directory name.
+            Currently an override refers to undefined ``local_folder``; cleanup
+            passes a PurePosixPath to ``shlex.quote`` and its failure handler
+            raises CalledProcessError without required constructor arguments.
+        """
         remote_folder = self.RP_WORKDIR / remote_output_folder
 
         ## Send to a different local folder than one in class scope, if forced
@@ -109,12 +174,12 @@ class RedPitayaRemoteInterface:
             local_output_path = Path(local_folder)
         else:
             local_output_path = self.LOCAL_DATA_DIR
-        
+
         ## Now we have parent level (destination) local directory for saving data
         ## create it if it doesn't exist
         if not local_output_path.exists():
             local_output_path.mkdir(parents=True, exist_ok=True) 
-        
+
         ## Run the data transfer command via SCP
         print(f"Copying {remote_folder} to {local_output_path}...")
         subprocess.run([ "scp", 
@@ -125,7 +190,7 @@ class RedPitayaRemoteInterface:
         print("Done. Downloaded data to local host.")
         local_data_path = local_output_path / remote_output_folder
         print(f"Downloaded data is saved locally at {local_data_path}.")
-        
+
         ## Delete folder after download
         if remove:
             print(f"Removing data from the RP...")
@@ -142,6 +207,21 @@ class RedPitayaRemoteInterface:
 
 def parse_cli_args():
     ## Initialize the parser wrapper
+    """Parse acquisition options from the process command line. [AI generated]
+
+    Returns:
+        argparse.Namespace: ``ip``, ``outdir``, ``samprate``, ``duration``,
+        ``laserpower``, and ``laserwavelen`` options. Invalid checked values
+        are replaced with class defaults and a message is printed.
+
+    Raises:
+        SystemExit: For help output or invalid argparse syntax.
+
+    Notes:
+        Checks IPv4 syntax, sampling rates in (0, 100000], power in [0, 17]
+        mW, and wavelength in [1520, 1570] nm. The intended duration check
+        of (0, 3600] seconds currently tests ``valid_samprate`` instead.
+    """
     parser = argparse.ArgumentParser(description="Run a DAQ script from a local machine on a remote RedPitaya.")
 
     ## Create a blank instance of the local interface class from which to pull default parameters
@@ -158,7 +238,7 @@ def parse_cli_args():
                         help=f'Sampling rate specified in samples per second. Default: {blank.SAMPLING_RATE_SPS}')
     parser.add_argument('--duration',       '-d', type=float, default=blank.SCAN_DURATION_S,
                         help=f'Total duration of the acquisition specified in seconds. Default: {blank.SCAN_DURATION_S}')
-    
+
     ## Command-line arguments for laser setpoints
     parser.add_argument('--laserpower',     '-l', type=float, default=blank.LASER_POWER_MW,
                         help=f'Power setpoint of laser specified in mW. Default: {blank.LASER_POWER_MW}')
@@ -173,7 +253,7 @@ def parse_cli_args():
     if not valid_ip: 
         print(f"Invalid IP: {args.ip}. Using default: {blank.RP_IP}")
         args.ip = blank.RP_IP
-        
+
     ## Validate arguments for DAQ configuration
     valid_samprate = (args.samprate > 0) and (args.samprate <= int(1e5)) 
     if not valid_samprate: 
@@ -195,7 +275,7 @@ def parse_cli_args():
     if not valid_laserwavelen: 
         print(f"Invalid laser wavelength setpoint: {args.laserpower} nm (1520-1570 allowed). Using default: {blank.LASER_WAVELENGTH_NM} nm")
         args.laserwavelen = blank.LASER_WAVELENGTH_NM
-    
+
     ## Delete blank class instance, return validated arguments
     del blank
     return args
@@ -203,6 +283,15 @@ def parse_cli_args():
 def run_full_daq():
 
     ## Parse the command line arguments
+    """Run the command-line acquisition and download workflow. [AI generated]
+
+    Notes:
+        Parses options, sets laser metadata, starts acquisition, and requests
+        download with remote deletion. Currently passes the complete
+        ``run_acquisition`` result tuple to ``copy_last_acquisition`` rather
+        than unpacking the folder and timing. Other existing acquisition
+        limitations are documented on the corresponding methods.
+    """
     args = parse_cli_args()
 
     ## Update the metadata with the command line arguments
@@ -214,6 +303,6 @@ def run_full_daq():
     local_output_dir  = rp.copy_last_acquisition(remote_output_dir, remove=True)
 
     print("Done.")
-    
+
 if __name__ == "__main__":
     run_full_daq()
