@@ -1,4 +1,5 @@
 import rp
+import time
 import h5py, numbers
 import numpy as np
 from pathlib import Path
@@ -62,14 +63,14 @@ class RedPitayaLocalDriver:
         print("Total chunks:", needed_chunks)
 
         return {
-            sampling_rate_real: "sampling_rate_real", 
-            decimation: "decimation", 
-            total_samples: "total_samples", 
-            needed_chunks: "needed_chunks", 
-            chunk_samples: "chunk_samples", 
+            "sampling_rate_real": sampling_rate_real, 
+            "decimation": decimation, 
+            "total_samples": total_samples, 
+            "needed_chunks": needed_chunks, 
+            "chunk_samples": chunk_samples, 
         }
 
-    def collectData(self, sampling_rate_wanted=32000, scan_duration=10, chunk_samples=32000, start_timestamp=None, extra_metadata={}):
+    def collectData(self, sampling_rate_wanted=32000, scan_duration=10, chunk_samples=32000, start_timestamp=None, extra_metadata=None):
         """Acquire channel 1 voltage chunks and save HDF5 files. [AI edit]
 
         Args:
@@ -106,10 +107,6 @@ class RedPitayaLocalDriver:
         needed_chunks = real_params["needed_chunks"]
         chunk_samples = real_params["chunk_samples"]
 
-        ## Connect to the RedPitaya
-        self.check(rp.rp_Init(), "rp_Init")
-        print("Connected")
-
         ## Set up folder
         if start_timestamp is None:
             start_time = datetime.now()
@@ -117,6 +114,10 @@ class RedPitayaLocalDriver:
             start_time = datetime.strptime(start_timestamp, self.DATESTRING_FMT)
         run_folder = Path(f"{start_time.strftime(self.DATESTRING_FMT)}_N{needed_chunks}")
         run_folder.mkdir(exist_ok = True)
+
+        ## Connect to the RedPitaya
+        self.check(rp.rp_Init(), "rp_Init")
+        print("Connected")
 
         ## Try to do the acquisition
         try:
@@ -144,11 +145,30 @@ class RedPitayaLocalDriver:
                 self.check(rp.rp_AcqStart(), "rp_AcqStart")
                 self.check(rp.rp_AcqSetTriggerSrc(rp.RP_TRIG_SRC_NOW), "rp_AcqSetTriggerSrc")
 
+                # while True:
+                #     buffer_fill = rp.rp_AcqAxiGetBufferFillState(rp.RP_CH_1)
+                #     self.check(buffer_fill[0], "rp_AcqAxiGetBufferFillState")
+                #     if buffer_fill[1]:
+                #         break
+
+                # Allow the expected acquisition time plus a margin.
+                timeout_sec = chunk_samples / sampling_rate_real + 10.0
+                deadline = time.monotonic() + timeout_sec
+
                 while True:
                     buffer_fill = rp.rp_AcqAxiGetBufferFillState(rp.RP_CH_1)
                     self.check(buffer_fill[0], "rp_AcqAxiGetBufferFillState")
+
                     if buffer_fill[1]:
                         break
+
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            f"Chunk {chunk_number}: buffer did not fill "
+                            f"within {timeout_sec:.1f} seconds"
+                        )
+
+                    time.sleep(0.001)
 
                 self.check(rp.rp_AcqStop(), "rp_AcqStop")
 
@@ -175,7 +195,8 @@ class RedPitayaLocalDriver:
                     f.attrs["decimation"] = decimation
 
                     ## Store arbitrary metadata
-                    for k,v in extra_metadata:
+                    if extra_metadata is None: extra_metadata = {}
+                    for k,v in extra_metadata.items():
                         if isinstance(v, numbers.Number) or isinstance(v, str):
                             f_attrs[k] = v
                         else:
