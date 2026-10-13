@@ -33,9 +33,8 @@ class RedPitayaLocalDriver:
 
         Returns:
             dict: Calculated rate, decimation, total samples, chunk count, and
-            aligned chunk size. The current implementation uses numeric values
-            as keys and parameter names as values; ``collectData`` expects the
-            reverse mapping and therefore currently raises ``KeyError``.
+            aligned chunk size, keyed by ``sampling_rate_real``, ``decimation``,
+            ``total_samples``, ``needed_chunks``, and ``chunk_samples``.
 
         Notes:
             Inputs are not validated. Zero divisors can raise ZeroDivisionError.
@@ -79,7 +78,7 @@ class RedPitayaLocalDriver:
             chunk_samples: Samples per file, aligned down to a multiple of eight.
             start_timestamp: Optional timestamp in ``DATESTRING_FMT`` format;
                 defaults to the device's current local time.
-            extra_metadata: Intended mapping of additional HDF5 attributes with
+            extra_metadata: Optional mapping of additional HDF5 attributes with
                 scalar numeric or string values.
 
         Returns:
@@ -88,15 +87,14 @@ class RedPitayaLocalDriver:
         Raises:
             RuntimeError: If a checked hardware operation fails.
             ValueError: If the supplied timestamp cannot be parsed.
+            TimeoutError: If a chunk buffer does not fill within its expected
+                sampling duration plus ten seconds.
 
         Notes:
             Requires the device's ``rp`` bindings and channel 1's physical jumper
             set to the high-voltage range. Files contain a ``Voltage (V)`` dataset
             and acquisition attributes. Acquisition is stopped and the API is
             released in the acquisition block's finally clause.
-            Currently blocked by the mapping returned by ``setParameters``.
-            Nonempty metadata also requires repairs: iteration does not use
-            ``items()`` and assignment refers to undefined ``f_attrs``.
         """
 
         ## Set the parameters and determine the real parameters
@@ -198,7 +196,7 @@ class RedPitayaLocalDriver:
                     if extra_metadata is None: extra_metadata = {}
                     for k,v in extra_metadata.items():
                         if isinstance(v, numbers.Number) or isinstance(v, str):
-                            f_attrs[k] = v
+                            f.attrs[k] = v
                         else:
                             print(f"Bad metadata: {k} is not a scalar number or string")
                     # f.attrs["laser_power"] = laser_power

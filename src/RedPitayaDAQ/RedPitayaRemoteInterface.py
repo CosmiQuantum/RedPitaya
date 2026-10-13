@@ -16,7 +16,7 @@ class RedPitayaRemoteInterface:
     DATESTRING_FMT = "%Y%m%d_%H%M%S"
 
     def __init__(self, ip="192.168.137.111", local_dir="rp_data"):
-        """Configure the remote connection and local data destination. [AI generated]
+        """Configure the remote connection and local data destination. [AI generated] [AI edit]
 
         Args:
             ip: Device IP address, default ``192.168.137.111``.
@@ -35,7 +35,7 @@ class RedPitayaRemoteInterface:
         self.LOCAL_DATA_DIR = Path(local_dir)
 
     def update_laser_params(self, power_mW=None, wavelength_nm=None):
-        """Update laser setpoints used as acquisition metadata. [AI generated]
+        """Update laser setpoints used as acquisition metadata. [AI generated] [AI edit]
 
         Args:
             power_mW: Power in milliwatts, converted to float when supplied.
@@ -53,7 +53,7 @@ class RedPitayaRemoteInterface:
             self.LASER_WAVELENGTH_NM = float(wavelength_nm)
 
     def update_local_datadir(self, local_folder):
-        """Set the destination directory for future downloads. [AI generated]
+        """Set the destination directory for future downloads. [AI generated] [AI edit]
 
         Args:
             local_folder: Path-like destination; created later during copying.
@@ -62,14 +62,14 @@ class RedPitayaRemoteInterface:
         self.LOCAL_DATA_DIR = Path(local_folder)
 
     def run_acquisition(self, sampling_rate_sps=None, scan_duration_sec=None):
-        """Launch a device acquisition over SSH and stream its output. [AI generated]
+        """Launch a device acquisition over SSH and stream its output. [AI generated] [AI edit]
 
         Args:
             sampling_rate_sps: Optional samples-per-second override, stored as float.
             scan_duration_sec: Optional duration override in seconds, stored as float.
 
         Returns:
-            tuple[str, float]: Intended remote output directory name and elapsed
+            tuple[str, float]: Remote output directory name and elapsed
             SSH acquisition time in seconds, including startup overhead.
 
         Raises:
@@ -77,10 +77,8 @@ class RedPitayaRemoteInterface:
             RuntimeError: If the remote output does not identify its output folder.
 
         Notes:
-            Requires SSH authentication and the driver on the device. Currently
-            the generated command uses unquoted metadata keys, and folder
-            validation/return refer to undefined ``output_folder`` instead of
-            ``remote_output_folder``. These issues prevent successful completion.
+            Requires SSH authentication and the package installed on the device.
+            The returned folder name is validated before it is returned.
         """
         ## Update parameters if provided
         if sampling_rate_sps is not None:
@@ -145,7 +143,7 @@ class RedPitayaRemoteInterface:
         return remote_output_folder, daq_duration_sec
 
     def copy_last_acquisition(self, remote_output_folder, local_folder_override=None, remove=True):
-        """Download a remote run directory using SCP. [AI generated]
+        """Download a remote run directory using SCP. [AI generated] [AI edit]
 
         Args:
             remote_output_folder: Run directory name relative to ``RP_WORKDIR``.
@@ -157,13 +155,10 @@ class RedPitayaRemoteInterface:
             pathlib.Path: Local path of the downloaded run directory.
 
         Raises:
-            subprocess.CalledProcessError: If SCP fails.
+            subprocess.CalledProcessError: If SCP or remote cleanup fails.
 
         Notes:
             Remote cleanup is destructive. Supply a trusted run directory name.
-            Currently an override refers to undefined ``local_folder``; cleanup
-            passes a PurePosixPath to ``shlex.quote`` and its failure handler
-            raises CalledProcessError without required constructor arguments.
         """
         ## Define where the data lives on the RP (ensure UNIX path)
         remote_folder = self.RP_WORKDIR / remote_output_folder
@@ -205,7 +200,7 @@ class RedPitayaRemoteInterface:
         return local_data_path
 
 def parse_cli_args():
-    """Parse acquisition options from the process command line. [AI generated]
+    """Parse acquisition options from the process command line. [AI generated] [AI edit]
 
     Returns:
         argparse.Namespace: ``ip``, ``outdir``, ``samprate``, ``duration``,
@@ -216,9 +211,9 @@ def parse_cli_args():
         SystemExit: For help output or invalid argparse syntax.
 
     Notes:
-        Checks IPv4 syntax, sampling rates in (0, 100000], power in [0, 17]
-        mW, and wavelength in [1520, 1570] nm. The intended duration check
-        of (0, 3600] seconds currently tests ``valid_samprate`` instead.
+        Checks IPv4 syntax, sampling rates in (0, 100000] samples per second,
+        duration in (0, 3600] seconds, power in [0, 17] mW, and wavelength
+        in [1520, 1570] nm.
     """
     ## Initialize the parser wrapper
     parser = argparse.ArgumentParser(description="Run a DAQ script from a local machine on a remote RedPitaya.")
@@ -260,7 +255,7 @@ def parse_cli_args():
         args.samprate = blank.SAMPLING_RATE_SPS
 
     valid_duration = (args.duration > 0) and (args.duration <= 3600) 
-    if not valid_samprate: 
+    if not valid_duration: 
         print(f"Invalid DAQ duration: {args.duration} sec (Maximum is 1 hour). Using default: {blank.SCAN_DURATION_S} sec")
         args.duration = blank.SCAN_DURATION_S
 
@@ -280,14 +275,11 @@ def parse_cli_args():
     return args
 
 def run_full_daq():
-    """Run the command-line acquisition and download workflow. [AI generated]
+    """Run the command-line acquisition and download workflow. [AI generated] [AI edit]
 
     Notes:
         Parses options, sets laser metadata, starts acquisition, and requests
-        download with remote deletion. Currently passes the complete
-        ``run_acquisition`` result tuple to ``copy_last_acquisition`` rather
-        than unpacking the folder and timing. Other existing acquisition
-        limitations are documented on the corresponding methods.
+        download with remote deletion using the returned acquisition folder.
     """
     ## Parse the command line arguments
     args = parse_cli_args()
