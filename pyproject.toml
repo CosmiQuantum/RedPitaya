@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Local and SSH-based Red Pitaya data acquisition interfaces"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["numpy", "h5py"]
+dependencies = ["numpy", "h5py", "matplotlib", "scipy"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
