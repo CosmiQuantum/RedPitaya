@@ -2,11 +2,14 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from glob import glob
 
 from scipy.signal import welch
 
-_ORR_SIGNAL_SIMS_INSTALLED_ = False
+DATESTRING_FMT = "%Y%m%d_%H%M%S"
 
+## Track if we have reconstruction algorithms installed
+_ORR_SIGNAL_SIMS_INSTALLED_ = False
 try:
     from orr_signal_sims import apply_matched_filter
     _ORR_SIGNAL_SIMS_INSTALLED_ = True
@@ -79,6 +82,17 @@ def plotData(filename, psd=True, trace=True):
         
     plt.show()
     return fg0, fg1
+
+def plotLatest(datadir="rp_data"):
+    datapath = Path(datadir)
+    all_dirs = np.sort(glob(f"{datapath}/"))
+    
+    newest_dir_name = all_dirs[-1].split("/")[-1]
+    newest_path = datapath / newest_dir_name
+
+    all_files = np.sort(glob(f"{newest_path}/"))
+    
+    return plotData(all_files[-1])
 
 def applyMatchFilter(filename, window=50):
     '''
