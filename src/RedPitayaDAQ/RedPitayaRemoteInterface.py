@@ -94,8 +94,8 @@ class RedPitayaRemoteInterface:
 
         ## Write the python script we need to execute on the RP
         remote_python = (
-            #"from RedPitayaLocalDriver import RedPitayaLocalDriver; "
-            "from RedPitayaDAQ.RedPitayaLocalDriver import RedPitayaLocalDriver; "
+            "from RedPitayaLocalDriver import RedPitayaLocalDriver; "
+            # "from RedPitayaDAQ.RedPitayaLocalDriver import RedPitayaLocalDriver; "
             "rpc = RedPitayaLocalDriver(); "
             "folder = rpc.collectData("
             f"sampling_rate_wanted={self.SAMPLING_RATE_SPS}, "
