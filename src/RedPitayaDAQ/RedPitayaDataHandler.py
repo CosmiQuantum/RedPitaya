@@ -4,9 +4,15 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from scipy.signal import welch
-from recon_algorithms import ( ## Needs to come from the other repo, not a copied file
-    apply_matched_filter,
-)
+
+_ORR_SIGNAL_SIMS_INSTALLED_ = False
+
+try:
+    from orr_signal_sims import apply_matched_filter
+    _ORR_SIGNAL_SIMS_INSTALLED_ = True
+except Exception as e:
+    print("ERROR importing orr_signal_sims")
+    _ORR_SIGNAL_SIMS_INSTALLED_ = False
 
 def loadData(filename, drop_last_sample=True):
     '''
@@ -18,6 +24,7 @@ def loadData(filename, drop_last_sample=True):
     - voltages:             voltage data from file
     - f_data:               sample frequencies
     - data_psd:             psd of data
+    - sampling_rate_real:   real sampling rate as recorded by RP
     '''
     file = Path(filename)
 
@@ -31,7 +38,7 @@ def loadData(filename, drop_last_sample=True):
 
     data_f, data_psd = welch(voltages, fs=sampling_rate_real, nperseg=n_samples // 8)
 
-    return times, voltages, data_f, data_psd
+    return times, voltages, data_f, data_psd, sampling_rate_real
 
 def plotData(filename, psd=True, trace=True):
     '''
@@ -44,7 +51,7 @@ def plotData(filename, psd=True, trace=True):
     - requested graphs
     '''
 
-    times, voltages, f_data, data_psd = loadData(filename)
+    times, voltages, f_data, data_psd, fsamp = loadData(filename)
 
     if trace:
         fg0 = plt.figure(figsize=(7,6))
@@ -82,7 +89,11 @@ def applyMatchFilter(filename, window=50):
     Returns:
     - trace with jumps labeled
     '''
-    time, voltages, f_data, data_psd = loadData(filename)
+    if not _ORR_SIGNAL_SIMS_INSTALLED_: 
+        print("orr-signal-sims not installed. This function will do nothing.")
+        return None
+
+    time, voltages, f_data, data_psd, fsamp = loadData(filename)
 
     jump_t, jump_a = apply_matched_filter(time, voltages, window, peak_find_sigma = 5, filter_template = None)
 
@@ -104,8 +115,13 @@ def get_multijumps(filename, window=50):
     - window:               matched-filter window in samples
     Returns:
     - jump_v:               list of waveform segments around detected jumps
+    - fsamp:                RP sampling rate
     '''
-    time, voltages, _, _ = loadData(filename)
+    if not _ORR_SIGNAL_SIMS_INSTALLED_: 
+        print("orr-signal-sims not installed. This function will do nothing.")
+        return None
+
+    time, voltages, _, _, fsamp = loadData(filename)
 
     jump_t, jump_a = apply_matched_filter(time, voltages, window, peak_find_sigma = 5,filter_template = None)
 
@@ -115,7 +131,7 @@ def get_multijumps(filename, window=50):
         jump_id = np.argmin(np.abs(time - jump_t[i]))
         jump_v.append(voltages[jump_id - 320 : jump_id + 320])
 
-    return jump_v
+    return jump_v, fsamp
 
 def graph_multijumps(filename, window=50):
     '''
@@ -126,14 +142,13 @@ def graph_multijumps(filename, window=50):
     Returns:
     - overlayed traces, with averaged trace in red
     '''
-    data = get_multijumps(filename, window = window)
+    if not _ORR_SIGNAL_SIMS_INSTALLED_: 
+        print("orr-signal-sims not installed. This function will do nothing.")
+        return None
 
-    with h5py.File(filename, "r") as f:
-        sampling_rate = f.attrs["sampling_rate"]
-
+    data, sampling_rate = get_multijumps(filename, window = window)
     times = np.arange(-320, 320) / sampling_rate * 1000
 
-    
     plt.figure()
     for i in range(len(data)):
         plt.plot(times, data[i], alpha = 0.1)
