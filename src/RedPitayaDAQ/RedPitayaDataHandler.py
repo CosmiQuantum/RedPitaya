@@ -32,9 +32,13 @@ def loadData(filename, drop_last_sample=True):
     file = Path(filename)
 
     with h5py.File(file, "r") as f:
+        ## Extract the voltages data
+        voltages = f["Voltage (V)"][:]
+
         ## Exclude the final sample of this file from analysis.
         if drop_last_sample: voltages = voltages[:-1]
         sampling_rate_real = f.attrs["sampling_rate"]
+        ## >TODO< Return full metadata dict
 
     n_samples = len(voltages)
     times = np.arange(n_samples) / sampling_rate_real
