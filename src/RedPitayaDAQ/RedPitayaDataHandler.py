@@ -85,12 +85,12 @@ def plotData(filename, psd=True, trace=True):
 
 def plotLatest(datadir="rp_data"):
     datapath = Path(datadir)
-    all_dirs = np.sort(glob(f"{datapath}/"))
+    all_dirs = np.sort(glob(f"{datapath}/*"))
     
     newest_dir_name = all_dirs[-1].split("/")[-1]
     newest_path = datapath / newest_dir_name
 
-    all_files = np.sort(glob(f"{newest_path}/"))
+    all_files = np.sort(glob(f"{newest_path}/*"))
     
     return plotData(all_files[-1])
 
