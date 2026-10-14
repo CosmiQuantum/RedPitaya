@@ -10,6 +10,7 @@ from .RedPitayaRemoteInterface import RedPitayaRemoteInterface
 from .RedPitayaDataHandler import (
     loadData,
     plotData,
+    plotLatest,
     applyMatchFilter,
     get_multijumps,
     graph_multijumps,
