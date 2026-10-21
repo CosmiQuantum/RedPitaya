@@ -50,7 +50,7 @@ class RedPitayaLocalDriver:
         ## Samples and chunks which will need to be collected. Note the chunk samples will need to be a multiple of 8
         total_samples = round(scan_duration * sampling_rate_real)
 
-        if scan_duration < 30:
+        if total_samples <= chunk_samples:
             total_samples = (total_samples // 8) * 8
             chunk_samples = total_samples
             
@@ -152,7 +152,7 @@ class RedPitayaLocalDriver:
                 self.check(rp.rp_AcqSetTriggerSrc(rp.RP_TRIG_SRC_NOW), "rp_AcqSetTriggerSrc")
 
                 # Allow the expected acquisition time plus a margin.
-                timeout_sec = chunk_samples / sampling_rate_real + 10.0
+                timeout_sec = chunk_samples / sampling_rate_real + 15.0
                 deadline = time.monotonic() + timeout_sec
                 
                 while True:

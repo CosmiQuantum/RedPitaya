@@ -11,6 +11,7 @@ from .RedPitayaDataHandler import (
     loadData,
     plotData,
     plotLatest,
+    plotLatestFolder,
     applyMatchFilter,
     get_multijumps,
     graph_multijumps,
