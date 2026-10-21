@@ -72,6 +72,8 @@ def plotData(filename, psd=True, trace=True):
         ax0 = None
     
     if psd:
+        f_data = f_data[f_data>=0]
+        data_psd = data_psd[f_data>=0]
         fg1 = plt.figure(figsize=(7,6))
         ax1 = fg1.gca()
         ax1.plot(f_data, data_psd)
@@ -80,6 +82,7 @@ def plotData(filename, psd=True, trace=True):
         ax1.set_xlabel("Frequency (Hz)")
         ax1.set_ylabel("Voltage PSD (V^2 / Hz)")
         ax1.set_title(filename)
+        ax1.axvline(x=f_data[np.argmax(data_psd)],c='k',ls='--')
     else:
         fg1 = None
         ax1 = None

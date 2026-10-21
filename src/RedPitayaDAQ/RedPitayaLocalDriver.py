@@ -49,6 +49,11 @@ class RedPitayaLocalDriver:
 
         ## Samples and chunks which will need to be collected. Note the chunk samples will need to be a multiple of 8
         total_samples = round(scan_duration * sampling_rate_real)
+
+        if scan_duration < 30:
+            total_samples = (total_samples // 8) * 8
+            chunk_samples = total_samples
+            
         chunk_samples = (chunk_samples // 8) * 8
         needed_chunks = int(np.ceil(total_samples / chunk_samples))
 
@@ -120,7 +125,7 @@ class RedPitayaLocalDriver:
         ## Try to do the acquisition
         try:
             ## Prepare circular memory
-            self.check(rp.rp_AcqSetGain(rp.RP_CH_1, rp.RP_HIGH), "rp_AcqSetGain")
+            self.check(rp.rp_AcqSetGain(rp.RP_CH_1, rp.RP_LOW), "rp_AcqSetGain")
             get_memory = rp.rp_AcqAxiGetMemoryRegion()
             self.check(get_memory[0], "rp_AcqAxiGetMemoryRegion")
             memory_start = get_memory[1]
@@ -129,11 +134,14 @@ class RedPitayaLocalDriver:
             chunk_number = 0
 
             while samples_collected < total_samples:
+                time_start = time.monotonic()
+                
                 chunk_number += 1
                 print(f"Collecting chunk {chunk_number}")
 
                 ## Set up acquisition
                 self.check(rp.rp_AcqReset(), "rp_AcqReset")
+                self.check(rp.rp_AcqSetGain(rp.RP_CH_1, rp.RP_LOW), "rp_AcqSetGain") #added line to set gain after reset
                 self.check(rp.rp_AcqAxiSetDecimationFactor(decimation), "rp_AcqAxiSetDecimationFactor")
                 self.check(rp.rp_AcqAxiSetTriggerDelay(rp.RP_CH_1, chunk_samples), "rp_AcqAxiSetTriggerDelay")
                 self.check(rp.rp_AcqAxiSetBufferSamples(rp.RP_CH_1, memory_start, chunk_samples), "rp_AcqAxiSetBufferSamples")
@@ -143,16 +151,10 @@ class RedPitayaLocalDriver:
                 self.check(rp.rp_AcqStart(), "rp_AcqStart")
                 self.check(rp.rp_AcqSetTriggerSrc(rp.RP_TRIG_SRC_NOW), "rp_AcqSetTriggerSrc")
 
-                # while True:
-                #     buffer_fill = rp.rp_AcqAxiGetBufferFillState(rp.RP_CH_1)
-                #     self.check(buffer_fill[0], "rp_AcqAxiGetBufferFillState")
-                #     if buffer_fill[1]:
-                #         break
-
                 # Allow the expected acquisition time plus a margin.
                 timeout_sec = chunk_samples / sampling_rate_real + 10.0
                 deadline = time.monotonic() + timeout_sec
-
+                
                 while True:
                     buffer_fill = rp.rp_AcqAxiGetBufferFillState(rp.RP_CH_1)
                     self.check(buffer_fill[0], "rp_AcqAxiGetBufferFillState")
@@ -170,6 +172,8 @@ class RedPitayaLocalDriver:
 
                 self.check(rp.rp_AcqStop(), "rp_AcqStop")
 
+                time_save = time.monotonic()
+                
                 # move buffer data into data file
                 memory_end = rp.rp_AcqAxiGetWritePointerAtTrig(rp.RP_CH_1)
                 self.check(memory_end[0], "rp_AcqAxiGetWritePointerAtTrig")
@@ -207,6 +211,11 @@ class RedPitayaLocalDriver:
                 samples_collected += chunk_samples
 
                 self.check(rp.rp_AcqAxiEnable(rp.RP_CH_1, False), "rp_AcqAxiEnable(False)")
+
+                time_end = time.monotonic()
+                print(f"Time for chunk to acquire: {time_save - time_start}")
+                print(f"Time for chunk to save: {time_end - time_save}")
+                print(f"Time for chunk total: {time_end - time_start}")
 
         ## Release hardware after done collecting
         finally:
