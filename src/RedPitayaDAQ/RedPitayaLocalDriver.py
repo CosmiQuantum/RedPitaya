@@ -9,6 +9,8 @@ class RedPitayaLocalDriver:
     '''Interface for running DAQ scripts locally on a RedPitaya.'''
 
     DATESTRING_FMT = "%Y%m%d_%H%M%S"
+    GAIN_SETTING = rp.RP_LOW
+    DAQ_CHANNEL  = rp.RP_CH_1
 
     def check(self, result, operation):
         """Check a status returned by the Red Pitaya API. [AI edit]
@@ -23,7 +25,30 @@ class RedPitayaLocalDriver:
         if result != rp.RP_OK:
             raise RuntimeError(f"{operation} failed:{result}")
 
-    def setParameters(self, sampling_rate_wanted, scan_duration, chunk_samples):
+    def setGain(self, setting="low"):
+        if setting.lower() not in ["low", "lo", "high", "hi"]:
+            return 1
+        else:
+            if   setting.lower() in ["low", "lo"]:
+                self.GAIN_SETTING = rp.RP_LOW
+            elif setting.lower() in ["high", "hi"]:
+                self.GAIN_SETTING = rp.RP_HIGH
+            else:
+                return 1
+        return 0
+
+    def setChannel(self, channel=1):
+        if int(channel) not in [1, 2, 3, 4]:
+            return 1
+        else:
+            if   int(channel) == 1: self.DAQ_CHANNEL  = rp.RP_CH_1
+            elif int(channel) == 2: self.DAQ_CHANNEL  = rp.RP_CH_2
+            # elif int(channel) == 3: self.DAQ_CHANNEL  = rp.RP_CH_3
+            # elif int(channel) == 4: self.DAQ_CHANNEL  = rp.RP_CH_4
+            else: return 1
+        return 0
+    
+    def setParameters(self, sampling_rate_wanted, scan_duration, chunk_samples, ch=1, gain='low'):
         """Calculate acquisition parameters from the 125 MHz clock. [AI edit]
 
         Args:
@@ -41,6 +66,8 @@ class RedPitayaLocalDriver:
             The final chunk is acquired in full, so the requested sample count
             may be exceeded.
         """
+        self.setGain(gain)
+        self.setChannel(ch)
 
         ## Getting actual sampling rate from the red pitaya clock
         clock = 125 * 10**6
@@ -125,7 +152,7 @@ class RedPitayaLocalDriver:
         ## Try to do the acquisition
         try:
             ## Prepare circular memory
-            self.check(rp.rp_AcqSetGain(rp.RP_CH_1, rp.RP_LOW), "rp_AcqSetGain")
+            self.check(rp.rp_AcqSetGain(self.DAQ_CHANNEL, self.GAIN_SETTING), "rp_AcqSetGain")
             get_memory = rp.rp_AcqAxiGetMemoryRegion()
             self.check(get_memory[0], "rp_AcqAxiGetMemoryRegion")
             memory_start = get_memory[1]
@@ -141,11 +168,11 @@ class RedPitayaLocalDriver:
 
                 ## Set up acquisition
                 self.check(rp.rp_AcqReset(), "rp_AcqReset")
-                self.check(rp.rp_AcqSetGain(rp.RP_CH_1, rp.RP_LOW), "rp_AcqSetGain") #added line to set gain after reset
+                self.check(rp.rp_AcqSetGain(self.DAQ_CHANNEL, self.GAIN_SETTING), "rp_AcqSetGain") #added line to set gain after reset
                 self.check(rp.rp_AcqAxiSetDecimationFactor(decimation), "rp_AcqAxiSetDecimationFactor")
-                self.check(rp.rp_AcqAxiSetTriggerDelay(rp.RP_CH_1, chunk_samples), "rp_AcqAxiSetTriggerDelay")
-                self.check(rp.rp_AcqAxiSetBufferSamples(rp.RP_CH_1, memory_start, chunk_samples), "rp_AcqAxiSetBufferSamples")
-                self.check(rp.rp_AcqAxiEnable(rp.RP_CH_1, True), "rp_AcqAxiEnable")
+                self.check(rp.rp_AcqAxiSetTriggerDelay(self.DAQ_CHANNEL, chunk_samples), "rp_AcqAxiSetTriggerDelay")
+                self.check(rp.rp_AcqAxiSetBufferSamples(self.DAQ_CHANNEL, memory_start, chunk_samples), "rp_AcqAxiSetBufferSamples")
+                self.check(rp.rp_AcqAxiEnable(self.DAQ_CHANNEL, True), "rp_AcqAxiEnable")
 
                 ## Acquisition
                 self.check(rp.rp_AcqStart(), "rp_AcqStart")
@@ -156,7 +183,7 @@ class RedPitayaLocalDriver:
                 deadline = time.monotonic() + timeout_sec
                 
                 while True:
-                    buffer_fill = rp.rp_AcqAxiGetBufferFillState(rp.RP_CH_1)
+                    buffer_fill = rp.rp_AcqAxiGetBufferFillState(self.DAQ_CHANNEL)
                     self.check(buffer_fill[0], "rp_AcqAxiGetBufferFillState")
 
                     if buffer_fill[1]:
@@ -175,10 +202,10 @@ class RedPitayaLocalDriver:
                 time_save = time.monotonic()
                 
                 # move buffer data into data file
-                memory_end = rp.rp_AcqAxiGetWritePointerAtTrig(rp.RP_CH_1)
+                memory_end = rp.rp_AcqAxiGetWritePointerAtTrig(self.DAQ_CHANNEL)
                 self.check(memory_end[0], "rp_AcqAxiGetWritePointerAtTrig")
                 voltage_data = rp.fBuffer(chunk_samples)
-                data_result = rp.rp_AcqAxiGetDataV(rp.RP_CH_1, memory_end[1], chunk_samples, voltage_data)
+                data_result = rp.rp_AcqAxiGetDataV(self.DAQ_CHANNEL, memory_end[1], chunk_samples, voltage_data)
                 self.check(data_result[0], "rp_AcqAxiGetDataV")
 
                 output = run_folder / (f"{start_time.strftime(self.DATESTRING_FMT)}_chunk{chunk_number}_of{needed_chunks}.h5")
@@ -210,7 +237,7 @@ class RedPitayaLocalDriver:
 
                 samples_collected += chunk_samples
 
-                self.check(rp.rp_AcqAxiEnable(rp.RP_CH_1, False), "rp_AcqAxiEnable(False)")
+                self.check(rp.rp_AcqAxiEnable(self.DAQ_CHANNEL, False), "rp_AcqAxiEnable(False)")
 
                 time_end = time.monotonic()
                 print(f"Time for chunk to acquire: {time_save - time_start}")
@@ -225,7 +252,7 @@ class RedPitayaLocalDriver:
                 pass
 
             try:
-                rp.rp_AcqAxiEnable(rp.RP_CH_1, False)
+                rp.rp_AcqAxiEnable(self.DAQ_CHANNEL, False)
             except Exception:
                 pass
 
