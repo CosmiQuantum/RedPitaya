@@ -90,7 +90,7 @@ def plotData(filename, psd=True, trace=True):
     plt.show()
     return fg0, fg1
 
-def plotLatest(datadir="rp_data"):
+def plotLatest(datadir="rp_data", psd = True, trace = True):
     datapath = Path(datadir)
     all_dirs = np.sort(glob(f"{datapath}/*"))
     
@@ -99,7 +99,20 @@ def plotLatest(datadir="rp_data"):
 
     all_files = np.sort(glob(f"{newest_path}/*"))
     
-    return plotData(all_files[-1])
+    return plotData(all_files[-1], psd = psd, trace = trace)
+
+
+def plotLatestFolder(datadir="rp_data", psd = True, trace = True):
+    datapath = Path(datadir)
+
+    all_dirs = sorted(p for p in datapath.iterdir() if p.is_dir())
+    newest_path = all_dirs[-1]
+
+    all_files = sorted(newest_path.glob("*.h5"))
+
+    for file in all_files:
+        plotData(str(file), psd = psd, trace = trace)
+
 
 def applyMatchFilter(filename, window=50):
     '''
